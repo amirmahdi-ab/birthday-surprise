@@ -18,7 +18,27 @@
    starts the canvas tree (Act 4), which owns its own rAF and
    plays once, then holds — living, never looping.
    ============================================================ */
+// Background Music Setup
+const bgMusic = new Audio('./music.mp3');
+bgMusic.loop = true;
+bgMusic.volume = 0.6;
 
+// Play music on the first user interaction
+const playAudio = () => {
+  bgMusic.play().then(() => {
+    // Remove listeners once audio starts playing successfully
+    window.removeEventListener('pointerdown', playAudio);
+    window.removeEventListener('touchstart', playAudio);
+    window.removeEventListener('click', playAudio);
+  }).catch(err => {
+    console.log('Audio playback waiting for user interaction:', err);
+  });
+};
+
+// Add interaction listeners for seamless autoplay
+window.addEventListener('pointerdown', playAudio);
+window.addEventListener('touchstart', playAudio);
+window.addEventListener('click', playAudio);
 import gsap from 'gsap';
 
 /* the pen-stroke plugin: a `drawn` 0..1 property for the underline */
