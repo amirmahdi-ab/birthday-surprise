@@ -18,28 +18,34 @@
    starts the canvas tree (Act 4), which owns its own rAF and
    plays once, then holds — living, never looping.
    ============================================================ */
-// Background Music Setup
+import gsap from 'gsap';
+
+// Background Music Engine
 const bgMusic = new Audio('./music.mp3');
 bgMusic.loop = true;
 bgMusic.volume = 0.6;
 
-// Play music on the first user interaction
-const playAudio = () => {
-  bgMusic.play().then(() => {
-    // Remove listeners once audio starts playing successfully
-    window.removeEventListener('pointerdown', playAudio);
-    window.removeEventListener('touchstart', playAudio);
-    window.removeEventListener('click', playAudio);
-  }).catch(err => {
-    console.log('Audio playback waiting for user interaction:', err);
-  });
+let musicStarted = false;
+
+const startBgMusic = () => {
+  if (!musicStarted) {
+    bgMusic.play().then(() => {
+      musicStarted = true;
+      // Remove listeners once audio starts playing successfully
+      window.removeEventListener('pointerdown', startBgMusic);
+      window.removeEventListener('touchstart', startBgMusic);
+      window.removeEventListener('click', startBgMusic);
+      window.removeEventListener('mousedown', startBgMusic);
+    }).catch(err => {
+      console.log('Audio playback waiting for user interaction:', err);
+    });
+  }
 };
 
-// Add interaction listeners for seamless autoplay
-window.addEventListener('pointerdown', playAudio);
-window.addEventListener('touchstart', playAudio);
-window.addEventListener('click', playAudio);
-import gsap from 'gsap';
+// Add interaction listeners for audio playback
+['pointerdown', 'touchstart', 'click', 'mousedown'].forEach(eventType => {
+  window.addEventListener(eventType, startBgMusic, { passive: true });
+});
 
 /* the pen-stroke plugin: a `drawn` 0..1 property for the underline */
 gsap.registerPlugin({
@@ -605,17 +611,11 @@ function applyNock(){
 }
 
 function refreshRig(){
-  // the grip is anchored here, and the heart sits at its layout centre (33% down,
-  // centred) — using the layout point, not a live rect, keeps the aim steady even
-  // while the heart is scaling in.
   const gripX = W * 0.24, gripY = H * 0.76;
   const heartX = W * 0.5, heartY = H * 0.33;
-  // rotation so local "up" (0,-1) maps to the grip→heart direction
   const aimRad = Math.atan2(heartX - gripX, gripY - heartY);
   pullUX = -Math.sin(aimRad); pullUY = Math.cos(aimRad);  // opposite of aim = pull-back
 
-  // #bow / #arrow are SVG — no offset* — so measure rects in the rig's LOCAL
-  // frame: neutralise the rig transform first (getBBox-style, sync, no paint).
   nockProxy.val = REST_NOCK; applyNock();
   gsap.set(archery, { rotation: 0, scale: 1, x: 0, y: 0 });
   archery.style.left = '0px'; archery.style.top = '0px';
@@ -632,7 +632,6 @@ function refreshRig(){
   arrowBaseX = nockLX - ((rR.left - aR.left) + 0.5 * rR.width);
   arrowBaseY = nockLY - ((rR.top  - aR.top ) + (205 / 220) * rR.height);
 
-  // anchor the grip at (gripX,gripY) and rotate the rig around it
   archery.style.left = (gripX - gripLX) + 'px';
   archery.style.top  = (gripY - gripLY) + 'px';
   gsap.set(archery, { transformOrigin: `${gripLX}px ${gripLY}px`, rotation: aimRad * 180 / Math.PI });
@@ -700,9 +699,6 @@ function burstHearts(){
 
 /* --- the shot + Acts 2–3 timeline ------------------------------------------ */
 function shotGeom(){
-  // flight distance = straight-line from the arrow tip to the heart (measured on
-  // screen, rotation-aware). Moving the arrow that far along its local "up" axis
-  // — which is aimed at the heart — lands the tip dead-centre on it.
   const tipR = tip.getBoundingClientRect();
   const tRect = target.getBoundingClientRect();
   const tipX = tipR.left + tipR.width / 2, tipY = tipR.top + tipR.height / 2;
@@ -728,7 +724,6 @@ function buildFilm(m){
     onComplete: () => {
       gsap.set(field, { autoAlpha: 0 });
       treeStart();
-      // fade promptly so the growing tree is revealed with no white hold
       gsap.to(bloom, { autoAlpha: 0, duration: 1.15, ease: 'power2.out' });
     },
   });
@@ -759,12 +754,10 @@ function buildFilm(m){
 
   // --- the strike: the arrow embeds, the heart recoils, then holds pierced --
   t.add(burstHearts, 0.26)
-   // recoil along the arrow's line (up + right), springing back
    .to(target, { x: 7, y: -9, duration: 0.06, ease: 'power2.out' }, 0.26)
    .to(target, { x: 0, y: 0, duration: 0.32, ease: 'power2.out' }, 0.32)
    .to(target, { scale: 1.14, duration: 0.06, ease: 'power2.out' }, 0.26)
    .to(target, { scale: 1.0, duration: 0.26, ease: 'power2.inOut' }, 0.32)
-   // the arrow shudders in the wound, holds embedded so the hit reads, then sinks in
    .to(arrow, { rotation: '+=4', duration: 0.05, yoyo: true, repeat: 4, ease: 'sine.inOut' }, 0.27)
    .set(arrow, { rotation: 0 }, 0.52)
    .to(arrow, { opacity: 0, duration: 0.16, ease: 'power1.out' }, 0.56);
@@ -783,9 +776,6 @@ function buildFilm(m){
    .set(flood, { autoAlpha: 0 }, 1.36);
 
   // --- the camera push -------------------------------------------------------
-  // duration matched to when the bloom covers (3.98) — a longer push used to
-  // keep the timeline (and a white bloom) alive after the tree should already
-  // be growing, which read as dead time before the tree appeared.
   t.fromTo(camera, { scale: 1.0, yPercent: 0 }, { scale: 1.07, yPercent: -1.3, duration: 2.6, ease: 'none' }, 1.38)
    .fromTo(fgrid, { xPercent: 0, yPercent: 0 }, { xPercent: -1.5, yPercent: -1.0, duration: 2.6, ease: 'none' }, 1.38);
 
@@ -821,6 +811,7 @@ let played = false, drawing = false, startPX = 0, startPY = 0, startDraw = 0;
 
 function fire(){
   if (played) return;
+  startBgMusic();
   played = true;
   drawing = false;
   stopBeat();
@@ -836,6 +827,7 @@ function springBack(){
 
 function autoFire(){
   if (played) return;
+  startBgMusic();
   recT0 = performance.now(); cue('draw');       // t=0 of the soundtrack
   gsap.to({ d: curDraw }, {
     d: maxDraw * 0.94, duration: 0.62, ease: 'power2.inOut',
@@ -846,6 +838,7 @@ function autoFire(){
 
 archery.addEventListener('pointerdown', (e) => {
   if (played) return;
+  startBgMusic();
   drawing = true;
   try { archery.setPointerCapture(e.pointerId); } catch (_) {}
   startPX = e.clientX; startPY = e.clientY; startDraw = curDraw;
@@ -853,8 +846,6 @@ archery.addEventListener('pointerdown', (e) => {
 });
 archery.addEventListener('pointermove', (e) => {
   if (!drawing) return;
-  // project the drag onto the pull-back axis, so dragging back along the aim
-  // (down + away from the heart) draws the string — on any shot angle.
   const proj = (e.clientX - startPX) * pullUX + (e.clientY - startPY) * pullUY;
   setDraw(startDraw + proj);
 });
