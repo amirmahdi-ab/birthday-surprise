@@ -20,30 +20,38 @@
    ============================================================ */
 import gsap from 'gsap';
 
+// ۱. وارد کردن مستقیم فایل موزیک برای پشتیبانی در Vite / Webpack / GitHub Pages
+import musicFile from './music.mp3';
+
 // Background Music Engine
-const bgMusic = new Audio('./music.mp3');
+const bgMusic = new Audio(musicFile);
 bgMusic.loop = true;
 bgMusic.volume = 0.6;
 
 let musicStarted = false;
 
 const startBgMusic = () => {
-  if (!musicStarted) {
-    bgMusic.play().then(() => {
-      musicStarted = true;
-      // Remove listeners once audio starts playing successfully
-      window.removeEventListener('pointerdown', startBgMusic);
-      window.removeEventListener('touchstart', startBgMusic);
-      window.removeEventListener('click', startBgMusic);
-      window.removeEventListener('mousedown', startBgMusic);
-    }).catch(err => {
-      console.log('Audio playback waiting for user interaction:', err);
-    });
+  if (musicStarted) return;
+
+  const playPromise = bgMusic.play();
+  if (playPromise !== undefined) {
+    playPromise
+      .then(() => {
+        musicStarted = true;
+        // پاک‌سازی شنودگرها بعد از موفقیت در پخش
+        window.removeEventListener('pointerdown', startBgMusic);
+        window.removeEventListener('touchstart', startBgMusic);
+        window.removeEventListener('click', startBgMusic);
+        window.removeEventListener('mousedown', startBgMusic);
+      })
+      .catch((err) => {
+        console.log('Audio playback waiting for user interaction:', err);
+      });
   }
 };
 
-// Add interaction listeners for audio playback
-['pointerdown', 'touchstart', 'click', 'mousedown'].forEach(eventType => {
+// افزودن شنودگر بر روی تمامی تعاملات کاربر
+['pointerdown', 'touchstart', 'click', 'mousedown'].forEach((eventType) => {
   window.addEventListener(eventType, startBgMusic, { passive: true });
 });
 
